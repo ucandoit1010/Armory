@@ -1,0 +1,52 @@
+ <!DOCTYPE html>
+<html>
+<head>
+<title>Page Title</title>
+ <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script> 
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.8.0/fullcalendar.min.css"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.20.1/moment.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.8.0/fullcalendar.min.js"></script>
+ 
+<script>
+var data = [
+        {
+          title: 'All Day Event',
+          start: '2018-01-08'
+        },
+        {
+          id: 100,
+          title: 'Repeating Event',
+          start: '2018-01-09'
+        },
+        {
+          id: 999,
+          title: 'Repeating Event',
+          start: '2018-01-16'
+        }
+      ];
+/* debugger; */
+data.push({title:'TEST',start:'2018-01-15'});
+
+$('#calendar').fullCalendar({
+      header: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'month,basicWeek,basicDay'
+      },
+      height:800,
+      defaultDate: '2018-01-01',
+      navLinks: true, // can click day/week names to navigate views
+      editable: true,
+      eventLimit: true, // allow "more" link when too many events
+      events: data
+    });
+
+</script>
+
+</head>
+<body>
+
+  <div id='calendar'></div>
+
+</body>
+</html> 
