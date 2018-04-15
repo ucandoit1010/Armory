@@ -1,3 +1,4 @@
+--自動對 TABLE 產生增刪查改預存程序(AUTO GENEREATE STORED PROCEDURE)  
 declare @prefix varchar(20) = '';
 declare @TableName sysname = 'Members' ;
 declare @col_name varchar(80) , @typ varchar(60), @count tinyint = 0 ,@values varchar(500) = '' , @param_str varchar(max) = '';
