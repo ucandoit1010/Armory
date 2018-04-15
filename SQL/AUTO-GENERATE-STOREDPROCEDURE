@@ -1,0 +1,177 @@
+declare @prefix varchar(20) = '';
+declare @TableName sysname = 'Members' ;
+declare @col_name varchar(80) , @typ varchar(60), @count tinyint = 0 ,@values varchar(500) = '' , @param_str varchar(max) = '';
+declare @CREATE_TBL TABLE ( cols varchar(max) )
+declare @CHK_SP varchar(500) = ''
+declare @Result varchar(max) = 'SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE ' + @prefix + 'Create' + @TableName 
+
+IF EXISTS ( SELECT * FROM   sysobjects 
+            WHERE  id = object_id(@prefix + 'Create' + @TableName )  and OBJECTPROPERTY(id, N'IsProcedure') = 1 )
+BEGIN
+	SET @CHK_SP = 'DROP PROCEDURE ' + @prefix + 'Create' + @TableName;
+    EXEC (@CHK_SP);
+END
+INSERT INTO @CREATE_TBL(cols) 
+SELECT 
+		CASE WHEN 
+			typ.name IN ('varchar','char','nvarchar') THEN '@' + col.name + ' ' + typ.name + '(' + CAST(col.max_length AS varchar) + ')' 
+		ELSE
+			'@' + col.name + ' ' + typ.name
+		END 
+	FROM sys.columns col  join sys.types typ on col.system_type_id = typ.system_type_id AND col.user_type_id = typ.user_type_id
+WHERE  object_id = object_id(@TableName);
+SET NOCOUNT ON
+
+DECLARE CREATE_CSR CURSOR  STATIC  FOR SELECT cols FROM @CREATE_TBL
+OPEN CREATE_CSR
+FETCH NEXT FROM CREATE_CSR INTO @col_name
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SET @count = @count + 1;
+	IF @@CURSOR_ROWS > @count
+	BEGIN
+		SET @values = @values + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 )) + ' ,';
+		SET @param_str = @param_str + '  ' + @col_name + ',' +  CHAR(13) + CHAR(10);
+	END
+	ELSE
+	BEGIN
+		SET @values = @values + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 ));
+		SET @param_str = @param_str + '  ' + @col_name
+	END
+	FETCH NEXT FROM CREATE_CSR INTO @col_name
+END
+CLOSE CREATE_CSR
+DEALLOCATE CREATE_CSR
+SET @Result = @Result + CHAR(13) + CHAR(10) + @param_str + '
+AS
+BEGIN
+	SET NOCOUNT ON;' + CHAR(13) + CHAR(10) +
+	'    INSERT INTO ' + @TableName + ' VALUES(' + @values + ') ;' +
++ CHAR(13) + CHAR(10) + 'END
+GO';
+PRINT @Result;
+PRINT '------------------新增↑--------------------'
+
+SET @count = 0;
+SET @Result = '';
+--SET @param_str = ''
+IF EXISTS ( SELECT * FROM   sysobjects 
+            WHERE  id = object_id(@prefix + 'Get' + @TableName + 'ById')  and OBJECTPROPERTY(id, N'IsProcedure') = 1 )
+BEGIN
+	SET @CHK_SP = 'DROP PROCEDURE ' + @prefix + 'Get' + @TableName + 'ById';
+    EXEC (@CHK_SP);
+END
+SET @Result = 'SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE ' + @prefix + 'Get' + @TableName + 'ById';
+PRINT @Result
+--PRINT @param_str
+declare @SELECT_TBL TABLE ( cols varchar(100) , typ varchar(60) );
+INSERT INTO @SELECT_TBL(cols,typ)
+SELECT  c.Name AS 'col_pk' , typ.name FROM sys.indexes i 
+INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+INNER JOIN sys.columns c ON ic.object_id = c.object_id and ic.column_id = c.column_id
+INNER JOIN sys.types typ on c.system_type_id = typ.system_type_id AND c.user_type_id = typ.user_type_id
+INNER JOIN sys.objects o ON i.object_id = o.object_id
+INNER JOIN sys.schemas sc ON o.schema_id = sc.schema_id
+WHERE i.is_primary_key = 1 AND o.Name = 'Members'
+DECLARE @KEYS VARCHAR(500) = ''
+DECLARE @CLAUSES VARCHAR(500) = ''
+DECLARE SELECT_CSR CURSOR  STATIC  FOR SELECT * FROM @SELECT_TBL
+OPEN SELECT_CSR
+FETCH NEXT FROM SELECT_CSR INTO @col_name , @typ
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SET @count = @count + 1;
+	IF @@CURSOR_ROWS > @count
+	BEGIN
+		--SET @values = @values + @col_name + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 )) + ' , ';
+		SET @KEYS = @KEYS + '  ' + '@' + @col_name + ' ' + @typ + ',' +  CHAR(13) + CHAR(10);
+		SET @CLAUSES += @col_name + '= @' + @col_name + ' AND ';
+	END
+	ELSE
+	BEGIN
+		--SET @values = @values + @col_name + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 ));
+		SET @KEYS =  @KEYS + '  ' + '@' + @col_name + ' ' + @typ
+		SET @CLAUSES += @col_name + '= @' + @col_name;
+	END
+	FETCH NEXT FROM SELECT_CSR INTO @col_name , @typ
+END
+CLOSE SELECT_CSR
+DEALLOCATE SELECT_CSR
+SET @Result = @KEYS + '
+AS
+BEGIN
+	SET NOCOUNT ON;' + CHAR(13) + CHAR(10) +
+	'    SELECT ' + REPLACE(@values ,'@','') + ' FROM ' + @TableName + ' WHERE ' + @CLAUSES + ';' +
++ CHAR(13) + CHAR(10) + 'END
+GO';
+
+PRINT @Result
+PRINT '------------------查詢↑--------------------'
+
+SET @Result = 'SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE ' + @prefix + 'Delete' + @TableName + 'ById'  + CHAR(13) + CHAR(10) + @KEYS + '
+AS
+BEGIN
+	SET NOCOUNT ON;' + CHAR(13) + CHAR(10) +
+	'    DELETE FROM ' + @TableName + ' WHERE ' + @CLAUSES + ';' +
++ CHAR(13) + CHAR(10) + 'END
+GO';
+
+PRINT @Result
+PRINT '------------------刪除↑--------------------'
+
+SET @count = 0
+SET @values = ''
+SET @Result = 'SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE ' + @prefix + 'Update' + @TableName + 'ById'  + CHAR(13) + CHAR(10) + @param_str
+
+DECLARE UPDATE_CSR CURSOR  STATIC  FOR SELECT cols FROM @CREATE_TBL
+OPEN UPDATE_CSR
+FETCH NEXT FROM UPDATE_CSR INTO @col_name
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SET @count = @count + 1;
+	IF @@CURSOR_ROWS > @count
+	BEGIN
+		SET @values = @values + REPLACE(LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 )),'@','') + ' = ' + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 )) + ' ,';
+		SET @param_str = @param_str + '  ' + @col_name + ',' +  CHAR(13) + CHAR(10);
+	END
+	ELSE
+	BEGIN
+		SET @values = @values + REPLACE(LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 )),'@','') + ' = ' + LEFT(@col_name,CHARINDEX(' ' ,@col_name , 0 ));
+		SET @param_str = @param_str + '  ' + @col_name
+	END
+	FETCH NEXT FROM UPDATE_CSR INTO @col_name
+END
+CLOSE UPDATE_CSR
+DEALLOCATE UPDATE_CSR
+
+SET @Result = @Result + 'AS
+BEGIN
+	SET NOCOUNT ON;' + CHAR(13) + CHAR(10) +
+	'    UPDATE ' + @TableName + ' SET ' + @values + CHAR(13) + CHAR(10) + 
+	'    WHERE ' + @CLAUSES + ';' + CHAR(13) + CHAR(10) + 'END
+GO';  
+
+
+
+PRINT @Result
+--SELECT * FROM @CREATE_TBL
+ --SELECT * FROM sys.columns col  join sys.types typ on col.system_type_id = typ.system_type_id AND col.user_type_id = typ.user_type_id
+ --WHERE  object_id = object_id(@TableName)
+
+ --EXEC [dbo].[CreateMembers] '6D54D876-4B47-4242-B611-F9D049BA962B' ,  'vasss' , '321321' , '2018-04-01' , 1
